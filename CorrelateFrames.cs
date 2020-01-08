@@ -1,18 +1,50 @@
-﻿
-
-using System;
+﻿using System;
 using System.Drawing;
+using System.CommandLine;
+using System.CommandLine.Invocation;
+using System.IO;
 
 namespace whiterabbitc
 {
     class CorrelateFrames
     {
-        private int maskSize;
-        private Bitmap[] frameArray;
-        
-        //code to load bitmaps and mask size
+        public static int Main(string[] args)
+        {
+            var rootCommand = new RootCommand
+            {
+                new Option(
+                    "--input",
+                    "Path to the input directory")
+                {
+                    Argument = new Argument<DirectoryInfo>()
+                },
+                new Option(
+                    "--output",
+                    "Path to the output file")
+                {
+                    Argument = new Argument<FileInfo>()
+                },
+                new Option(
+                    "--mask",
+                    "Mask size")
+                {
+                    Argument = new Argument<int>(defaultValue: () => 3)
+                }
+            };
+            rootCommand.Handler = CommandHandler.Create<DirectoryInfo, FileInfo, int>((input, output, mask) =>
+            {
+                FileInfo[] fileArray = input.GetFiles();
+                Bitmap[] frameArray = null;
+                for (int i = 0; i < fileArray.Length; i++)
+                {
+                    frameArray[i] = new Bitmap(fileArray[i].FullName);
+                }
+                CorrelateFrames CF = new CorrelateFrames();
+                float[] correlationData = CF.plotCorrelation(mask, frameArray);
+            });
 
-        private float[] correlation => plotCorrelation(maskSize, frameArray);
+            return rootCommand.InvokeAsync(args).Result;
+        }
 
         public float[] plotCorrelation(int maskSize, Bitmap[] frameArray)
         {
@@ -21,7 +53,7 @@ namespace whiterabbitc
             Bitmap frame1;
             Bitmap frame2;
 
-            for (int i = 1; i <= frameCount - 1; i++) 
+            for (int i = 1; i <= frameCount - 1; i++)
             {
                 float[] corrArray = new float[frameCount - i];
 
@@ -46,7 +78,7 @@ namespace whiterabbitc
             int masksY = (int) (frame.Height / maskSize);
 
             float[] maskArray = new float[masksX * masksY];
-            float[] localArea = new float[maskSize^2];
+            float[] localArea = new float[maskSize * maskSize];
 
             int counter = 0;
 
@@ -64,11 +96,51 @@ namespace whiterabbitc
                         for (int x = xStep; x < (xStep + maskSize); x++)
                         {
                             localArea[index] = frame.GetPixel(x, y).R;
-
+                            index++;
                         }
                     }
+                    maskArray[counter] = getMean(localArea);
+                    counter++;
                 }
             }
+            return maskArray;
         }
+
+        public float getR(float[] frame1, float[] frame2)
+        {
+            float t1 = 0, t2 = 0, sum = 0;
+		    float xMean = getMean(frame1);
+		    float yMean = getMean(frame2);
+		    float xStd = getStdDev(xMean, frame1);
+		    float yStd = getStdDev(yMean, frame2);
+		    for (int i = 0; i < frame1.Length; i++)
+            {
+			    t1 = (frame1[i] - xMean) / xStd;
+			    t2 = (frame2[i] - yMean) / yStd;
+			    sum = sum + (t1 * t2);
+		    }
+		    float r = sum / (frame1.Length - 1);
+		    return r;
+        }
+
+        public float getMean(float[] dataSet)
+        {
+            float mean = 0;
+		    for (int i = 0; i < dataSet.Length; i++) {
+			mean += dataSet[i];
+		}
+		return (float) (mean / dataSet.Length);
+        }
+
+        public float getStdDev(float mean, float[] frame)
+        {
+            float stdDev = 0;
+			for (int i = 0; i < frame.Length; i++) {
+				stdDev += sqr(mean - frame[i]);
+			}
+			return (float) (Math.Sqrt(stdDev / (frame.Length - 1)));
+        }
+
+        public float sqr(float i) { return i * i;}
     }
 }
