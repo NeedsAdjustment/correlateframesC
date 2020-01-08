@@ -19,10 +19,10 @@ namespace whiterabbitc
                     Argument = new Argument<DirectoryInfo>()
                 },
                 new Option(
-                    "--output",
-                    "Path to the output file")
+                    "--frames",
+                    "Number of frames to process")
                 {
-                    Argument = new Argument<FileInfo>()
+                    Argument = new Argument<int>(defaultValue: () => 0)
                 },
                 new Option(
                     "--mask",
@@ -31,16 +31,22 @@ namespace whiterabbitc
                     Argument = new Argument<int>(defaultValue: () => 3)
                 }
             };
-            rootCommand.Handler = CommandHandler.Create<DirectoryInfo, FileInfo, int>((input, output, mask) =>
+            rootCommand.Handler = CommandHandler.Create<DirectoryInfo, int, int>((input, frames, mask) =>
             {
                 FileInfo[] fileArray = input.GetFiles();
-                Bitmap[] frameArray = null;
-                for (int i = 0; i < fileArray.Length; i++)
+                if (frames >= fileArray.Length) {frames = fileArray.Length;};
+                if (frames == 0) {frames = fileArray.Length;};
+                Bitmap[] frameArray = new Bitmap[frames];
+                for (int i = 0; i < frames; i++)
                 {
                     frameArray[i] = new Bitmap(fileArray[i].FullName);
                 }
                 CorrelateFrames CF = new CorrelateFrames();
                 float[] correlationData = CF.plotCorrelation(mask, frameArray);
+                for (int i = 0; i < correlationData.Length; i++)
+                {
+                    Console.WriteLine(correlationData[i]);
+                }
             });
 
             return rootCommand.InvokeAsync(args).Result;
@@ -53,11 +59,11 @@ namespace whiterabbitc
             Bitmap frame1;
             Bitmap frame2;
 
-            for (int i = 1; i <= frameCount - 1; i++)
+            for (int i = 1; i < frameCount; i++)
             {
                 float[] corrArray = new float[frameCount - i];
 
-                for (int j = 1; j <= frameCount - 1; j++)
+                for (int j = 1; j < frameCount - i; j++)
                 {
                     frame1 = frameArray[j];
                     frame2 = frameArray[i + j];

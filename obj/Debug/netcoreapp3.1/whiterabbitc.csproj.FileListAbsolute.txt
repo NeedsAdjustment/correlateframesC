@@ -27,3 +27,10 @@ F:\GitHub\correlateframesC\obj\Debug\netcoreapp3.1\whiterabbitc.AssemblyInfo.cs
 F:\GitHub\correlateframesC\obj\Debug\netcoreapp3.1\whiterabbitc.csproj.CopyComplete
 F:\GitHub\correlateframesC\obj\Debug\netcoreapp3.1\whiterabbitc.dll
 F:\GitHub\correlateframesC\obj\Debug\netcoreapp3.1\whiterabbitc.pdb
+D:\whiterabbitc\bin\Debug\netcoreapp3.1\Microsoft.Win32.SystemEvents.dll
+D:\whiterabbitc\bin\Debug\netcoreapp3.1\System.CommandLine.dll
+D:\whiterabbitc\bin\Debug\netcoreapp3.1\System.Drawing.Common.dll
+D:\whiterabbitc\bin\Debug\netcoreapp3.1\runtimes\win\lib\netcoreapp3.0\Microsoft.Win32.SystemEvents.dll
+D:\whiterabbitc\bin\Debug\netcoreapp3.1\runtimes\unix\lib\netcoreapp3.0\System.Drawing.Common.dll
+D:\whiterabbitc\bin\Debug\netcoreapp3.1\runtimes\win\lib\netcoreapp3.0\System.Drawing.Common.dll
+D:\whiterabbitc\obj\Debug\netcoreapp3.1\whiterabbitc.csproj.CopyComplete
