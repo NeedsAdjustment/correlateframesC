@@ -658,19 +658,19 @@
     ]
   },
   "packageFolders": {
-    "C:\\Users\\joshu\\.nuget\\packages\\": {}
+    "C:\\Users\\Josh\\.nuget\\packages\\": {}
   },
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "D:\\whiterabbitc\\whiterabbitc.csproj",
+      "projectUniqueName": "F:\\GitHub\\correlateframesC\\whiterabbitc.csproj",
       "projectName": "whiterabbitc",
-      "projectPath": "D:\\whiterabbitc\\whiterabbitc.csproj",
-      "packagesPath": "C:\\Users\\joshu\\.nuget\\packages\\",
-      "outputPath": "D:\\whiterabbitc\\obj\\",
+      "projectPath": "F:\\GitHub\\correlateframesC\\whiterabbitc.csproj",
+      "packagesPath": "C:\\Users\\Josh\\.nuget\\packages\\",
+      "outputPath": "F:\\GitHub\\correlateframesC\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
-        "C:\\Users\\joshu\\AppData\\Roaming\\NuGet\\NuGet.Config"
+        "C:\\Users\\Josh\\AppData\\Roaming\\NuGet\\NuGet.Config"
       ],
       "originalTargetFrameworks": [
         "netcoreapp3.1"

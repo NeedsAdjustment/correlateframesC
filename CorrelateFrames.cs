@@ -3,9 +3,25 @@ using System.Drawing;
 using System.CommandLine;
 using System.CommandLine.Invocation;
 using System.IO;
+using System.Linq;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
 
 namespace whiterabbitc
 {
+    internal static class SafeNativeMethods
+    {
+        [DllImport("shlwapi.dll", CharSet = CharSet.Unicode)]
+        public static extern int StrCmpLogicalW(string psz1, string psz2);
+    }
+
+    public sealed class NaturalFileInfoNameComparer : IComparer<FileInfo>
+    {
+        public int Compare(FileInfo a, FileInfo b)
+        {
+            return SafeNativeMethods.StrCmpLogicalW(a.Name, b.Name);
+        }
+    }
     class CorrelateFrames
     {
         public static int Main(string[] args)
@@ -34,13 +50,11 @@ namespace whiterabbitc
             rootCommand.Handler = CommandHandler.Create<DirectoryInfo, int, int>((input, frames, mask) =>
             {
                 FileInfo[] fileArray = input.GetFiles();
+                Array.Sort(fileArray, new NaturalFileInfoNameComparer());
                 if (frames >= fileArray.Length) {frames = fileArray.Length;};
                 if (frames == 0) {frames = fileArray.Length;};
                 Bitmap[] frameArray = new Bitmap[frames];
-                for (int i = 0; i < frames; i++)
-                {
-                    frameArray[i] = new Bitmap(fileArray[i].FullName);
-                }
+                for (int i = 0; i < frames; i++) {frameArray[i] = new Bitmap(fileArray[i].FullName);}
                 CorrelateFrames CF = new CorrelateFrames();
                 float[] correlationData = CF.plotCorrelation(mask, frameArray);
             });
@@ -52,24 +66,16 @@ namespace whiterabbitc
         {
             int frameCount = frameArray.Length;
             float[] correlation = new float[frameCount - 1];
-            Bitmap frame1;
-            Bitmap frame2;
 
-            for (int i = 1; i < frameCount; i++)
+            for (int i = 1; i <= frameCount - 1; i++)
             {
                 float[] corrArray = new float[frameCount - i];
 
-                for (int j = 1; j < frameCount - i; j++)
+                for (int j = 1; j <= frameCount - i; j++)
                 {
-                    frame1 = frameArray[j];
-                    frame2 = frameArray[i + j];
-
-                    float[] meanframe1 = getMeanFrame(maskSize, frame1);
-                    float[] meanframe2 = getMeanFrame(maskSize, frame2);
-
-                    corrArray[j - 1] = (float) (getR(meanframe1, meanframe2));
+                    corrArray[j - 1] = getR(getMeanFrame(maskSize, frameArray[j - 1]), getMeanFrame(maskSize, frameArray[i + j - 1]));
                 }
-                correlation[i - 1] = getMean(corrArray);
+                correlation[i - 1] = corrArray.Average();
                 Console.WriteLine(correlation[i - 1]);
             }
             return correlation;
@@ -88,21 +94,23 @@ namespace whiterabbitc
             for (int i = 0; i < masksY; i++)
             {
                 int yStep = i * maskSize;
+                int yStepMask = yStep + maskSize;
 
                 for (int j = 0; j < masksX; j++)
                 {
                     int xStep = j * maskSize;
+                    int xStepMask = xStep + maskSize;
                     int index = 0;
 
-                    for (int y = yStep; y < (yStep + maskSize); y++)
+                    for (int y = yStep; y < yStepMask; y++)
                     {
-                        for (int x = xStep; x < (xStep + maskSize); x++)
+                        for (int x = xStep; x < xStepMask; x++)
                         {
                             localArea[index] = frame.GetPixel(x, y).GetBrightness();
                             index++;
                         }
                     }
-                    maskArray[counter] = getMean(localArea);
+                    maskArray[counter] = localArea.Average();
                     counter++;
                 }
             }
@@ -111,39 +119,24 @@ namespace whiterabbitc
 
         public float getR(float[] frame1, float[] frame2)
         {
-            float t1 = 0, t2 = 0, sum = 0;
-		    float xMean = getMean(frame1);
-		    float yMean = getMean(frame2);
-		    float xStd = getStdDev(xMean, frame1);
-		    float yStd = getStdDev(yMean, frame2);
-		    for (int i = 0; i < frame1.Length; i++)
-            {
-			    t1 = (frame1[i] - xMean) / xStd;
-			    t2 = (frame2[i] - yMean) / yStd;
-			    sum = sum + (t1 * t2);
-		    }
-		    float r = sum / (frame1.Length - 1);
-		    return r;
-        }
+            var avg1 = frame1.Average();
+            var avg2 = frame2.Average();
 
-        public float getMean(float[] dataSet)
-        {
-            float mean = 0;
-		    for (int i = 0; i < dataSet.Length; i++) {
-			mean += dataSet[i];
-		}
-		return (float) (mean / dataSet.Length);
+            var sum1 = frame1.Zip(frame2, (x1, y1) => (x1 - avg1) * (y1 - avg2)).Sum();
+
+            var sumSqr1 = (float) (frame1.Sum(x => Math.Pow((x - avg1), 2.0)));
+            var sumSqr2 = (float) (frame2.Sum(y => Math.Pow((y - avg2), 2.0)));
+
+            var result = (float) (sum1 / Math.Sqrt(sumSqr1 * sumSqr2));
+
+            return result;
         }
 
         public float getStdDev(float mean, float[] frame)
         {
             float stdDev = 0;
-			for (int i = 0; i < frame.Length; i++) {
-				stdDev += sqr(mean - frame[i]);
-			}
+			foreach (float fr in frame) {stdDev += (mean - fr) * (mean - fr);}
 			return (float) (Math.Sqrt(stdDev / (frame.Length - 1)));
         }
-
-        public float sqr(float i) { return i * i;}
     }
 }
