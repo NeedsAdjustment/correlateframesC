@@ -84,20 +84,20 @@ namespace whiterabbitc
 
         public double[] getMeanFrame(int maskSize, Bitmap frame)
         {
-            int counter = 0;
             double[] maskArray;
 
             unsafe
             {
                 BitmapData frameData = frame.LockBits(new Rectangle(0, 0, frame.Width, frame.Height), ImageLockMode.ReadWrite, frame.PixelFormat);
-                int masksX = (int) (frameData.Width / maskSize);
-                int masksY = (int) (frameData.Height / maskSize);
+
+                int masksX = frameData.Width / maskSize;
+                int masksY = frameData.Height / maskSize;
                 double[] maskArrayUnsafe = new double[masksX * masksY];
+
                 int bytesPerPixel = System.Drawing.Bitmap.GetPixelFormatSize(frame.PixelFormat) / 8;
-                int maskBytes = bytesPerPixel * maskSize;
-                int heightInPixels = frameData.Height;
-                int widthInBytes = frameData.Width * bytesPerPixel;
                 byte* PtrFirstPixel = (byte*)frameData.Scan0;
+
+                int counter = 0;
 
                 for (int i = 0; i < masksY; i++)
                 {
@@ -111,9 +111,9 @@ namespace whiterabbitc
                         for (int y = yStep; y < yStep + maskSize; y++)
                         {
                             byte* currentLine = PtrFirstPixel + (y * frameData.Stride);
-                            for (int x = xStep; x < xStep + maskBytes; x = x + bytesPerPixel)
+                            for (int x = xStep; x < xStep + bytesPerPixel * maskSize; x = x + bytesPerPixel)
                             {
-                                sum += (double)currentLine[x]/255.00;
+                                sum += (double) currentLine[x] / 255;
                             }
                         }
                         maskArrayUnsafe[counter] = sum / (maskSize * maskSize);
@@ -128,13 +128,13 @@ namespace whiterabbitc
 
         public double getR(double[] frame1, double[] frame2)
         {
-            var avg1 = frame1.Average();
-            var avg2 = frame2.Average();
+            double avg1 = frame1.Average();
+            double avg2 = frame2.Average();
 
-            var sum1 = frame1.Zip(frame2, (x1, y1) => (x1 - avg1) * (y1 - avg2)).Sum();
+            double sum1 = frame1.Zip(frame2, (x1, y1) => (x1 - avg1) * (y1 - avg2)).Sum();
 
-            var sumSqr1 = frame1.Sum(x => Math.Pow((x - avg1), 2));
-            var sumSqr2 = frame2.Sum(y => Math.Pow((y - avg2), 2));
+            double sumSqr1 = frame1.Sum(x => Math.Pow((x - avg1), 2));
+            double sumSqr2 = frame2.Sum(y => Math.Pow((y - avg2), 2));
 
             return sum1 / Math.Sqrt(sumSqr1 * sumSqr2);
         }
