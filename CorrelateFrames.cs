@@ -43,10 +43,6 @@ namespace whiterabbitc
                 }
                 CorrelateFrames CF = new CorrelateFrames();
                 float[] correlationData = CF.plotCorrelation(mask, frameArray);
-                for (int i = 0; i < correlationData.Length; i++)
-                {
-                    Console.WriteLine(correlationData[i]);
-                }
             });
 
             return rootCommand.InvokeAsync(args).Result;
@@ -74,6 +70,7 @@ namespace whiterabbitc
                     corrArray[j - 1] = (float) (getR(meanframe1, meanframe2));
                 }
                 correlation[i - 1] = getMean(corrArray);
+                Console.WriteLine(correlation[i - 1]);
             }
             return correlation;
         }
@@ -101,7 +98,7 @@ namespace whiterabbitc
                     {
                         for (int x = xStep; x < (xStep + maskSize); x++)
                         {
-                            localArea[index] = frame.GetPixel(x, y).R;
+                            localArea[index] = frame.GetPixel(x, y).GetBrightness();
                             index++;
                         }
                     }
