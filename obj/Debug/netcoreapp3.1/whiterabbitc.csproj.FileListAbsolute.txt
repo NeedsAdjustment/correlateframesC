@@ -51,3 +51,4 @@ C:\Users\rosbo\Documents\GitHub\correlateframesC\obj\Debug\netcoreapp3.1\whitera
 C:\Users\rosbo\Documents\GitHub\correlateframesC\obj\Debug\netcoreapp3.1\whiterabbitc.csproj.CopyComplete
 C:\Users\rosbo\Documents\GitHub\correlateframesC\obj\Debug\netcoreapp3.1\whiterabbitc.dll
 C:\Users\rosbo\Documents\GitHub\correlateframesC\obj\Debug\netcoreapp3.1\whiterabbitc.pdb
+C:\Users\rosbo\Documents\GitHub\correlateframesC\obj\Debug\netcoreapp3.1\whiterabbitc.csprojAssemblyReference.cache

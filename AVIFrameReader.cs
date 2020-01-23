@@ -63,6 +63,7 @@ namespace whiterabbitc
 
         /// <summary>
         /// Opens a new .avi filestream for decoding based on the given path string.
+        /// TODO: Extend colour format support; deal with inverted bitmaps
         /// </summary>
         /// <param name="path">File path</param>
         public AVIFrameReader(string path)
@@ -99,7 +100,7 @@ namespace whiterabbitc
 
             //Load frame information
             FrameWidth = bmInfo.biWidth;
-            FrameHeight = bmInfo.biHeight;
+            FrameHeight = Math.Abs(bmInfo.biHeight);    //May be negative if bitmap inverted
             FrameStride = FrameWidth * bmInfo.biBitCount / 8;
             FrameSize = FrameStride * FrameHeight;
 
@@ -133,17 +134,7 @@ namespace whiterabbitc
             }
 
             byte[] dataArray = new byte[bmInfo.biSizeImage];
-
-            //Create bitmap with data pointed to by AVIStreamGetFrame
-            using (Bitmap b = new Bitmap(bmInfo.biWidth, bmInfo.biHeight, FrameStride, PixelFormat.Format8bppIndexed, frame + dataOffset))
-            {
-                //Lock bits for reading to allow copying of bitmap data
-                BitmapData data = b.LockBits(new Rectangle(0, 0, bmInfo.biWidth, bmInfo.biHeight), ImageLockMode.ReadOnly, PixelFormat.Format8bppIndexed);
-
-                Marshal.Copy(data.Scan0, dataArray, 0, bmInfo.biSizeImage);     //Copy data over to managed array
-
-                b.UnlockBits(data);
-            }
+            Marshal.Copy(frame + dataOffset, dataArray, 0, bmInfo.biSizeImage);     //Copy data over to managed array
 
             return dataArray;
         }

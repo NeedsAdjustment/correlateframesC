@@ -1,12 +1,9 @@
 ﻿using System;
-using System.Drawing;
-using System.Drawing.Imaging;
 using System.CommandLine;
 using System.CommandLine.Invocation;
 using System.IO;
 using System.Linq;
 using System.Collections.Generic;
-using System.Runtime.InteropServices;
 
 namespace whiterabbitc
 {
@@ -17,14 +14,20 @@ namespace whiterabbitc
             var rootCommand = new RootCommand
             {
                 new Option(
+                    new[] {"--input", "-i"},
+                    "Input folder containing .avi files")
+                {
+                    Argument = new Argument<DirectoryInfo>(defaultValue: () => null)
+                },
+                new Option(
                     new[] {"--output", "-o"},
-                    "(Function Modified) Output folder to store results")
+                    "Output folder to store results")
                 {
                     Argument = new Argument<DirectoryInfo>(defaultValue: () => null)
                 },
                 new Option(
                     new[] {"--frames", "-f"},
-                    "(Deprecated) Frames to process")
+                    "Frames to process")
                 {
                     Argument = new Argument<int>(defaultValue: () => 0)
                 },
@@ -59,84 +62,87 @@ namespace whiterabbitc
                     Argument = new Argument<string>(defaultValue: () => "Correlation")
                 }
             };
-            rootCommand.Handler = CommandHandler.Create<DirectoryInfo, int, int, int, int, int, string>((output, frames, mask, maskx, masky, separation, title) =>
-            {
-                DirectoryInfo workingPath = new DirectoryInfo(Directory.GetCurrentDirectory());
-                if (output == null) output = workingPath;
 
-                //Correct for omission of trailing '\' on directory path
-                string outDir = output.FullName.EndsWith('\\') ? output.FullName : output.FullName + '\\';
-
-                int videoCount = 0;
-                FileInfo[] fileArray = workingPath.GetFiles();
-                foreach (FileInfo file in fileArray) if (file.Extension == ".avi") videoCount++;
-                Console.WriteLine("Found " + videoCount + " video files in " + workingPath);
-                if(videoCount == 0) return;
-
-                int successCount = 0;
-
-                foreach (FileInfo file in fileArray)
-                {
-                    if (file.Extension == ".avi")
-                    {
-                        try
-                        {
-                            using (AVIFrameReader aviRead = new AVIFrameReader(file.FullName))
-                            {
-                                if (maskx == 0) { maskx = mask; masky = mask; }
-
-                                Console.WriteLine("Reading " + Path.GetFileName(file.FullName) + "...");
-
-                                //Load all frames from .avi into array
-                                byte[][] frameArray = new byte[aviRead.FrameCount][];
-                                for (int i = 0; i < aviRead.FrameCount; i++)
-                                {
-                                    frameArray[i] = aviRead.GetFrameData(i);
-                                }
-
-                                Console.WriteLine("Processing...");
-                                var correlationData = PlotCorrelation(maskx, masky, aviRead.FrameWidth, aviRead.FrameHeight, aviRead.FrameStride, frameArray, separation);
-
-                                int[] outputIndex = Enumerable.Range(1, aviRead.FrameCount).ToArray();
-                                List<string> indexStr = outputIndex.Select(x => x.ToString()).ToList();
-                                indexStr.Insert(0, "Frame");
-
-                                List<string> correlationStr = correlationData.correlation.Select(x => x.ToString()).ToList();
-                                correlationStr.Insert(0, "1");
-                                correlationStr.Insert(0, "Correlation");
-
-                                List<string> brightnessStr = correlationData.brightness.Select(x => x.ToString()).ToList();
-                                brightnessStr.Insert(0, "Brightness");
-
-                                string[][] csvData = new string[3][];
-                                csvData[0] = indexStr.ToArray();
-                                csvData[1] = correlationStr.ToArray();
-                                csvData[2] = brightnessStr.ToArray();
-
-                                //Create file name for output .csv with same name as input .avi in supplied output directory
-                                FileInfo fileOutput = new FileInfo(outDir + Path.GetFileNameWithoutExtension(file.FullName) + ".csv");
-
-                                using (StreamWriter outputFile = fileOutput.CreateText())
-                                {
-                                    for (int x = 0; x < aviRead.FrameCount + 1; x++)
-                                    {
-                                        string line = csvData[0][x] + "," + csvData[1][x] + "," + csvData[2][x];
-                                        outputFile.WriteLine(line);
-                                    }
-                                }
-                                successCount++;
-                            }
-                        }
-                        catch (Exception e)
-                        {
-                            Console.WriteLine(e.Message);
-                        }
-                    }
-                }
-                Console.WriteLine("Successfully auto-correlated " + successCount + "/" + videoCount + " videos.");
-            });
+            rootCommand.Handler = CommandHandler.Create(new Action<DirectoryInfo, DirectoryInfo, int, int, int, int, int, string>(Excecute));
 
             return rootCommand.InvokeAsync(args).Result;
+        }
+
+        private static void Excecute(DirectoryInfo input, DirectoryInfo output, int frames, int mask, int maskx, int masky, int separation, string title)
+        {
+            if(input == null) input = new DirectoryInfo(Directory.GetCurrentDirectory());
+            if (output == null) output = input;
+
+            //Correct for omission of trailing '\' on directory path
+            string outDir = output.FullName.EndsWith('\\') ? output.FullName : output.FullName + '\\';
+
+            int videoCount = 0;
+            FileInfo[] fileArray = input.GetFiles();
+            foreach (FileInfo file in fileArray) if (file.Extension == ".avi") videoCount++;
+            Console.WriteLine("Found " + videoCount + " video files in " + input);
+            if (videoCount == 0) return;
+
+            int successCount = 0;
+
+            foreach (FileInfo file in fileArray)
+            {
+                if (file.Extension == ".avi")
+                {
+                    try
+                    {
+                        using (AVIFrameReader aviRead = new AVIFrameReader(file.FullName))
+                        {
+                            if (maskx == 0) { maskx = mask; masky = mask; }
+
+                            Console.WriteLine("Reading " + Path.GetFileName(file.FullName) + "...");
+
+                            //Load all frames from .avi into array
+                            byte[][] frameArray = new byte[aviRead.FrameCount][];
+                            for (int i = 0; i < aviRead.FrameCount; i++)
+                            {
+                                frameArray[i] = aviRead.GetFrameData(i);
+                            }
+
+                            Console.WriteLine("Processing...");
+                            var correlationData = PlotCorrelation(maskx, masky, aviRead.FrameWidth, aviRead.FrameHeight, aviRead.FrameStride, frameArray, separation);
+
+                            int[] outputIndex = Enumerable.Range(1, aviRead.FrameCount).ToArray();
+                            List<string> indexStr = outputIndex.Select(x => x.ToString()).ToList();
+                            indexStr.Insert(0, "Frame");
+
+                            List<string> correlationStr = correlationData.correlation.Select(x => x.ToString()).ToList();
+                            correlationStr.Insert(0, "1");
+                            correlationStr.Insert(0, "Correlation");
+
+                            List<string> brightnessStr = correlationData.brightness.Select(x => x.ToString()).ToList();
+                            brightnessStr.Insert(0, "Brightness");
+
+                            string[][] csvData = new string[3][];
+                            csvData[0] = indexStr.ToArray();
+                            csvData[1] = correlationStr.ToArray();
+                            csvData[2] = brightnessStr.ToArray();
+
+                            //Create file name for output .csv with same name as input .avi in supplied output directory
+                            FileInfo fileOutput = new FileInfo(outDir + Path.GetFileNameWithoutExtension(file.FullName) + ".csv");
+
+                            using (StreamWriter outputFile = fileOutput.CreateText())
+                            {
+                                for (int x = 0; x < aviRead.FrameCount + 1; x++)
+                                {
+                                    string line = csvData[0][x] + "," + csvData[1][x] + "," + csvData[2][x];
+                                    outputFile.WriteLine(line);
+                                }
+                            }
+                            successCount++;
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        Console.WriteLine(e.Message);
+                    }
+                }
+            }
+            Console.WriteLine("Successfully auto-correlated " + successCount + "/" + videoCount + " videos.");
         }
 
         public static (double[] correlation, double[] brightness) PlotCorrelation(int maskSizeX, int maskSizeY, int width, int height, int stride, byte[][] frameArray, int separation)
