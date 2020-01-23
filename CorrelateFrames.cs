@@ -10,19 +10,6 @@ using System.Runtime.InteropServices;
 
 namespace whiterabbitc
 {
-    internal static class SafeNativeMethods
-    {
-        [DllImport("shlwapi.dll", CharSet = CharSet.Unicode)]
-        public static extern int StrCmpLogicalW(string psz1, string psz2);
-    }
-
-    public sealed class NaturalFileInfoNameComparer : IComparer<FileInfo>
-    {
-        public int Compare(FileInfo a, FileInfo b)
-        {
-            return SafeNativeMethods.StrCmpLogicalW(a.Name, b.Name);
-        }
-    }
     class CorrelateFrames
     {
         public static int Main(string[] args)
@@ -31,13 +18,13 @@ namespace whiterabbitc
             {
                 new Option(
                     new[] {"--output", "-o"},
-                    "Output filepath")
+                    "(Function Modified) Output folder to store results")
                 {
-                    Argument = new Argument<FileInfo>(defaultValue: () => null)
+                    Argument = new Argument<DirectoryInfo>(defaultValue: () => null)
                 },
                 new Option(
                     new[] {"--frames", "-f"},
-                    "Frames to process")
+                    "(Deprecated) Frames to process")
                 {
                     Argument = new Argument<int>(defaultValue: () => 0)
                 },
@@ -72,55 +59,92 @@ namespace whiterabbitc
                     Argument = new Argument<string>(defaultValue: () => "Correlation")
                 }
             };
-            rootCommand.Handler = CommandHandler.Create<FileInfo, int, int, int, int, int, string>((output, frames, mask, maskx, masky, separation, title) =>
+            rootCommand.Handler = CommandHandler.Create<DirectoryInfo, int, int, int, int, int, string>((output, frames, mask, maskx, masky, separation, title) =>
             {
-                DirectoryInfo workingPath = Directory.GetParent(Directory.GetCurrentDirectory());
+                DirectoryInfo workingPath = new DirectoryInfo(Directory.GetCurrentDirectory());
+                if (output == null) output = workingPath;
+
+                //Correct for omission of trailing '\' on directory path
+                string outDir = output.FullName.EndsWith('\\') ? output.FullName : output.FullName + '\\';
+
+                int videoCount = 0;
                 FileInfo[] fileArray = workingPath.GetFiles();
-                Array.Sort(fileArray, new NaturalFileInfoNameComparer());
-                if (frames >= fileArray.Length || frames == 0) {frames = fileArray.Length;}
-                if (maskx == 0) {maskx = mask; masky = mask;}
-                Bitmap[] frameArray = new Bitmap[frames];
-                for (int i = 0; i < frames; i++) {frameArray[i] = new Bitmap(fileArray[i].FullName);}
-                CorrelateFrames CF = new CorrelateFrames();
-                var correlationData = CF.plotCorrelation(maskx, masky, frameArray, separation);
+                foreach (FileInfo file in fileArray) if (file.Extension == ".avi") videoCount++;
+                Console.WriteLine("Found " + videoCount + " video files in " + workingPath);
+                if(videoCount == 0) return;
 
-                int[] outputIndex = Enumerable.Range(1, frames).ToArray();
-                List<string> indexStr = outputIndex.Select(x=>x.ToString()).ToList();
-                indexStr.Insert(0, "Frame");
+                int successCount = 0;
 
-                List<string> correlationStr = correlationData.correlation.Select(x=>x.ToString()).ToList();
-                correlationStr.Insert(0, "1");
-                correlationStr.Insert(0, "Correlation");
-
-                List<string> brightnessStr = correlationData.brightness.Select(x=>x.ToString()).ToList();
-                brightnessStr.Insert(0, "Brightness");
-
-                string[][] csvData = new string[3][];
-                csvData[0] = indexStr.ToArray();
-                csvData[1] = correlationStr.ToArray();
-                csvData[2] = brightnessStr.ToArray();
-
-                if (output == null) {output = new FileInfo("output.csv");}
-
-                using (StreamWriter outputFile = output.CreateText())
+                foreach (FileInfo file in fileArray)
                 {
-                    for (int x = 0; x < frames + 1; x++)
+                    if (file.Extension == ".avi")
                     {
-                        string line = csvData[0][x] + "," + csvData[1][x] + "," + csvData[2][x];
-                        outputFile.WriteLine(line);
+                        try
+                        {
+                            using (AVIFrameReader aviRead = new AVIFrameReader(file.FullName))
+                            {
+                                if (maskx == 0) { maskx = mask; masky = mask; }
+
+                                Console.WriteLine("Reading " + Path.GetFileName(file.FullName) + "...");
+
+                                //Load all frames from .avi into array
+                                byte[][] frameArray = new byte[aviRead.FrameCount][];
+                                for (int i = 0; i < aviRead.FrameCount; i++)
+                                {
+                                    frameArray[i] = aviRead.GetFrameData(i);
+                                }
+
+                                Console.WriteLine("Processing...");
+                                var correlationData = PlotCorrelation(maskx, masky, aviRead.FrameWidth, aviRead.FrameHeight, aviRead.FrameStride, frameArray, separation);
+
+                                int[] outputIndex = Enumerable.Range(1, aviRead.FrameCount).ToArray();
+                                List<string> indexStr = outputIndex.Select(x => x.ToString()).ToList();
+                                indexStr.Insert(0, "Frame");
+
+                                List<string> correlationStr = correlationData.correlation.Select(x => x.ToString()).ToList();
+                                correlationStr.Insert(0, "1");
+                                correlationStr.Insert(0, "Correlation");
+
+                                List<string> brightnessStr = correlationData.brightness.Select(x => x.ToString()).ToList();
+                                brightnessStr.Insert(0, "Brightness");
+
+                                string[][] csvData = new string[3][];
+                                csvData[0] = indexStr.ToArray();
+                                csvData[1] = correlationStr.ToArray();
+                                csvData[2] = brightnessStr.ToArray();
+
+                                //Create file name for output .csv with same name as input .avi in supplied output directory
+                                FileInfo fileOutput = new FileInfo(outDir + Path.GetFileNameWithoutExtension(file.FullName) + ".csv");
+
+                                using (StreamWriter outputFile = fileOutput.CreateText())
+                                {
+                                    for (int x = 0; x < aviRead.FrameCount + 1; x++)
+                                    {
+                                        string line = csvData[0][x] + "," + csvData[1][x] + "," + csvData[2][x];
+                                        outputFile.WriteLine(line);
+                                    }
+                                }
+                                successCount++;
+                            }
+                        }
+                        catch (Exception e)
+                        {
+                            Console.WriteLine(e.Message);
+                        }
                     }
                 }
+                Console.WriteLine("Successfully auto-correlated " + successCount + "/" + videoCount + " videos.");
             });
 
             return rootCommand.InvokeAsync(args).Result;
         }
 
-        public (double[] correlation, double[] brightness) plotCorrelation(int maskSizeX, int maskSizeY, Bitmap[] frameArray, int separation)
+        public static (double[] correlation, double[] brightness) PlotCorrelation(int maskSizeX, int maskSizeY, int width, int height, int stride, byte[][] frameArray, int separation)
         {
             int frameCount = frameArray.Length;
 
             double[][] brightnessArrayArray = new double[frameCount][];
-            for (int i = 0; i < frameCount; i++) {brightnessArrayArray[i] = getMeanFrame(maskSizeX, maskSizeY, frameArray[i]);}
+            for (int i = 0; i < frameCount; i++) {brightnessArrayArray[i] = GetMeanFrame(maskSizeX, maskSizeY, width, height, stride, frameArray[i]);}
 
             double[] brightness  = new double[frameCount];
             for (int i = 0; i < frameCount; i++) {brightness[i] = brightnessArrayArray[i].Average();}
@@ -132,13 +156,13 @@ namespace whiterabbitc
 
                 if (separation == 0)
                 {
-                    for (int j = 1; j <= frameCount - i; j++) {corrSum += getR(brightnessArrayArray[j - 1], brightnessArrayArray[i + j - 1]);}
+                    for (int j = 1; j <= frameCount - i; j++) {corrSum += GetR(brightnessArrayArray[j - 1], brightnessArrayArray[i + j - 1]);}
                     correlation[i - 1] = corrSum / (frameCount - i);
                 }
                 else
                 {
                     for (int j = 1; j <= frameCount - i && j <= separation; j++)
-                    {corrSum += getR(brightnessArrayArray[j - 1], brightnessArrayArray[i + j - 1]);}
+                    {corrSum += GetR(brightnessArrayArray[j - 1], brightnessArrayArray[i + j - 1]);}
                     if ((frameCount - i) < separation) {correlation[i - 1] = corrSum / (frameCount - i);}
                     else {correlation[i - 1] = corrSum / separation;}
                 }
@@ -146,51 +170,42 @@ namespace whiterabbitc
             return (correlation, brightness);
         }
 
-        public double[] getMeanFrame(int maskSizeX, int maskSizeY, Bitmap frame)
+        public static double[] GetMeanFrame(int maskSizeX, int maskSizeY, int width, int height, int stride, byte[] frame)
         {
-            double[] maskArray;
+            int masksX = width / maskSizeX;
+            int masksY = height / maskSizeY;
+            double[] maskArray = new double[masksX * masksY];
 
-            unsafe
+            int bytesPerPixel = 1;
+
+            int counter = 0;
+
+            for (int i = 0; i < masksY; i++)
             {
-                BitmapData frameData = frame.LockBits(new Rectangle(0, 0, frame.Width, frame.Height), ImageLockMode.ReadWrite, frame.PixelFormat);
+                int yStep = i * maskSizeY;
 
-                int masksX = frameData.Width / maskSizeX;
-                int masksY = frameData.Height / maskSizeY;
-                double[] maskArrayUnsafe = new double[masksX * masksY];
-
-                int bytesPerPixel = System.Drawing.Bitmap.GetPixelFormatSize(frame.PixelFormat) / 8;
-                byte* PtrFirstPixel = (byte*)frameData.Scan0;
-
-                int counter = 0;
-
-                for (int i = 0; i < masksY; i++)
+                for (int j = 0; j < masksX; j++)
                 {
-                    int yStep = i * maskSizeY;
+                    int xStep = j * maskSizeX * bytesPerPixel;
+                    double sum = 0;
 
-                    for (int j = 0; j < masksX; j++)
+                    for (int y = yStep; y < yStep + maskSizeY; y++)
                     {
-                        int xStep = j * maskSizeX * bytesPerPixel;
-                        double sum = 0;
-
-                        for (int y = yStep; y < yStep + maskSizeY; y++)
+                        int currentLineIndex = y * stride;
+                        for (int x = xStep; x < xStep + bytesPerPixel * maskSizeX; x += bytesPerPixel)
                         {
-                            byte* currentLine = PtrFirstPixel + (y * frameData.Stride);
-                            for (int x = xStep; x < xStep + bytesPerPixel * maskSizeX; x = x + bytesPerPixel)
-                            {
-                                sum += (double) currentLine[x] / 255;
-                            }
+                            sum += (double) frame[currentLineIndex + x] / 255;
                         }
-                        maskArrayUnsafe[counter] = sum / (maskSizeX * maskSizeY);
-                        counter++;
                     }
+                    maskArray[counter] = sum / (maskSizeX * maskSizeY);
+                    counter++;
                 }
-                maskArray = maskArrayUnsafe;
-                frame.UnlockBits(frameData);
             }
+
             return maskArray;
         }
 
-        public double getR(double[] frame1, double[] frame2)
+        public static double GetR(double[] frame1, double[] frame2)
         {
             double avg1 = frame1.Average();
             double avg2 = frame2.Average();
@@ -203,7 +218,7 @@ namespace whiterabbitc
             return sum1 / Math.Sqrt(sumSqr1 * sumSqr2);
         }
 
-        public double getStdDev(double mean, double[] frame)
+        public static double GetStdDev(double mean, double[] frame)
         {
             double stdDev = 0;
 			foreach (double mask in frame) {stdDev += Math.Pow((mean - mask), 2);}

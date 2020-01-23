@@ -1,25 +1,27 @@
 {
   "format": 1,
   "restore": {
-    "F:\\GitHub\\correlateframesC\\whiterabbitc.csproj": {}
+    "C:\\Users\\rosbo\\Documents\\GitHub\\correlateframesC\\whiterabbitc.csproj": {}
   },
   "projects": {
-    "F:\\GitHub\\correlateframesC\\whiterabbitc.csproj": {
+    "C:\\Users\\rosbo\\Documents\\GitHub\\correlateframesC\\whiterabbitc.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "F:\\GitHub\\correlateframesC\\whiterabbitc.csproj",
+        "projectUniqueName": "C:\\Users\\rosbo\\Documents\\GitHub\\correlateframesC\\whiterabbitc.csproj",
         "projectName": "whiterabbitc",
-        "projectPath": "F:\\GitHub\\correlateframesC\\whiterabbitc.csproj",
-        "packagesPath": "C:\\Users\\Josh\\.nuget\\packages\\",
-        "outputPath": "F:\\GitHub\\correlateframesC\\obj\\",
+        "projectPath": "C:\\Users\\rosbo\\Documents\\GitHub\\correlateframesC\\whiterabbitc.csproj",
+        "packagesPath": "C:\\Users\\rosbo\\.nuget\\packages\\",
+        "outputPath": "C:\\Users\\rosbo\\Documents\\GitHub\\correlateframesC\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
-          "C:\\Users\\Josh\\AppData\\Roaming\\NuGet\\NuGet.Config"
+          "C:\\Users\\rosbo\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
         ],
         "originalTargetFrameworks": [
           "netcoreapp3.1"
         ],
         "sources": {
+          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
           "https://api.nuget.org/v3/index.json": {}
         },
         "frameworks": {
@@ -59,31 +61,12 @@
           ],
           "assetTargetFallback": true,
           "warn": true,
-          "downloadDependencies": [
-            {
-              "name": "Microsoft.AspNetCore.App.Runtime.win-x64",
-              "version": "[3.1.0, 3.1.0]"
-            },
-            {
-              "name": "Microsoft.NETCore.App.Runtime.win-x64",
-              "version": "[3.1.0, 3.1.0]"
-            },
-            {
-              "name": "Microsoft.WindowsDesktop.App.Runtime.win-x64",
-              "version": "[3.1.0, 3.1.0]"
-            }
-          ],
           "frameworkReferences": {
             "Microsoft.NETCore.App": {
               "privateAssets": "all"
             }
           },
           "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\3.1.100\\RuntimeIdentifierGraph.json"
-        }
-      },
-      "runtimes": {
-        "win-x64": {
-          "#import": []
         }
       }
     }

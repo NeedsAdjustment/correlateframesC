@@ -1,0 +1,239 @@
+﻿using System;
+using System.Drawing;
+using System.Drawing.Imaging;
+using System.Runtime.InteropServices;
+
+namespace whiterabbitc
+{
+    internal class AVIFrameReader : IDisposable
+    {
+        public const int ST_VIDEO = 0x73646976;                     //Four-byte code (FourCC) corresponding to video streams (ascii: "vids")
+        public const int ERR_READ_ST_FMT_OVERFLOW = -2147205004;    //Error code returned when getting stream format and more data is present
+
+        //Structure containing information about a bitmap
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        private struct BITMAPINFOHEADER
+        {
+            public int biSize;
+            public int biWidth;
+            public int biHeight;
+            public short biPlanes;
+            public short biBitCount;
+            public int biCompression;
+            public int biSizeImage;
+            public int biXPelsPerMeter;
+            public int biYPelsPerMeter;
+            public int biClrUsed;
+            public int biClrImportant;
+        }
+
+        private readonly IntPtr avi;
+        private readonly IntPtr frameObj;
+        private readonly int dataOffset;
+        private readonly int streamStart;
+
+        private IntPtr frame;
+        private BITMAPINFOHEADER bmInfo = new BITMAPINFOHEADER();
+        private bool streamClosed = false;
+
+        /// <summary>
+        /// Returns the stride of each frame (number of bytes comprising one scan line)
+        /// </summary>
+        public int FrameStride { get; }
+
+        /// <summary>
+        /// Returns the number of frames in the stream
+        /// </summary>
+        public int FrameCount { get; }
+
+        /// <summary>
+        /// Returns the width of each frame in pixels
+        /// </summary>
+        public int FrameWidth { get; }
+
+        /// <summary>
+        /// Returns the height of each frame in pixels
+        /// </summary>
+        public int FrameHeight { get; }
+
+        /// <summary>
+        /// Returns the size of each frame in bytes
+        /// </summary>
+        public int FrameSize { get; }
+
+        /// <summary>
+        /// Opens a new .avi filestream for decoding based on the given path string.
+        /// </summary>
+        /// <param name="path">File path</param>
+        public AVIFrameReader(string path)
+        {
+            int bmInfoSz = Marshal.SizeOf(bmInfo);
+
+            int res = AVIStreamOpenFromFile(out avi, path, ST_VIDEO, 0, 0, 0);
+            if (res != 0)
+            {
+                throw new Exception("Unable to open file '" + path + "'. Error code: " + res.ToString());
+            }
+
+            streamStart = AVIStreamStart(avi);
+            FrameCount = AVIStreamLength(avi) - streamStart - 1;
+            res = AVIStreamReadFormat(avi, 0, ref bmInfo, ref bmInfoSz);
+
+            //Allow an error result here as only interested in the bitmap header and not subsequent not palette information
+            if (FrameCount < 0 || streamStart < 0 || (res != 0 && res != ERR_READ_ST_FMT_OVERFLOW))
+            {
+                throw new Exception("Unable to read .avi format");
+            }
+
+            if (bmInfo.biBitCount != 8)
+            {
+                throw new Exception("Unsupported image format: images must be 8-bit monochrome");
+            }
+
+            frameObj = AVIStreamGetFrameOpen(avi, ref bmInfo);
+
+            if (frameObj == null)
+            {
+                throw new Exception("No suitible decompressors found for supplied .avi file");
+            }
+
+            //Load frame information
+            FrameWidth = bmInfo.biWidth;
+            FrameHeight = bmInfo.biHeight;
+            FrameStride = FrameWidth * bmInfo.biBitCount / 8;
+            FrameSize = FrameStride * FrameHeight;
+
+            //Offset is size of info header + colour palette (32 bpp)
+            dataOffset = Marshal.SizeOf(bmInfo) + (bmInfo.biClrUsed * 4);
+        }
+
+        /// <summary>
+        /// Returns a byte array containing the bitmap data for a single (zero-indexed) frame n.
+        /// The format is one byte per pixel, and the frame size is given by properties FrameWidth and FrameHeight.
+        /// </summary>
+        /// <param name="n">Frame number</param>
+        /// <returns></returns>
+        public byte[] GetFrameData(int n)
+        {
+            if (streamClosed == true)
+            {
+                throw new Exception("Error: stream is closed");
+            }
+
+            if (n < 0 || n >= FrameCount)
+            {
+                throw new Exception("Supplied frame number is out of range");
+            }
+
+            frame = AVIStreamGetFrame(frameObj, n + 1 + streamStart);
+
+            if (frame == null)
+            {
+                throw new Exception("Unable to read frame " + n.ToString());
+            }
+
+            byte[] dataArray = new byte[bmInfo.biSizeImage];
+
+            //Create bitmap with data pointed to by AVIStreamGetFrame
+            using (Bitmap b = new Bitmap(bmInfo.biWidth, bmInfo.biHeight, FrameStride, PixelFormat.Format8bppIndexed, frame + dataOffset))
+            {
+                //Lock bits for reading to allow copying of bitmap data
+                BitmapData data = b.LockBits(new Rectangle(0, 0, bmInfo.biWidth, bmInfo.biHeight), ImageLockMode.ReadOnly, PixelFormat.Format8bppIndexed);
+
+                Marshal.Copy(data.Scan0, dataArray, 0, bmInfo.biSizeImage);     //Copy data over to managed array
+
+                b.UnlockBits(data);
+            }
+
+            return dataArray;
+        }
+
+        /// <summary>
+        /// Helper function for converting a byte array (obtained with GetFrameData) to a windows bitmap.
+        /// </summary>
+        /// <param name="data">Byte array containing bitmap data (1 byte per pixel)</param>
+        /// <param name="width">Width of bitmap in pixels</param>
+        /// <param name="height">Height of bitmap in pixels</param>
+        /// <returns></returns>
+        public static Bitmap GetBitmapFromFrameData(byte[] data, int width, int height)
+        {
+            Bitmap bmp = new Bitmap(width, height, PixelFormat.Format8bppIndexed);
+
+            BitmapData bmData = bmp.LockBits(new Rectangle(0, 0, width, height), ImageLockMode.ReadWrite, bmp.PixelFormat);
+            Marshal.Copy(data, 0, bmData.Scan0, data.Length);
+            bmp.UnlockBits(bmData);
+
+            ColorPalette ncp = bmp.Palette;
+            for (int i = 0; i < 256; i++) ncp.Entries[i] = Color.FromArgb(255, i, i, i);
+            bmp.Palette = ncp;
+
+            return bmp;
+        }
+
+        /// <summary>
+        /// Close the .avi stream and release any resources used by the AVIFrameReader
+        /// </summary>
+        public void Close()
+        {
+            streamClosed = true;
+            AVIStreamGetFrameClose(frameObj);
+            AVIStreamRelease(avi);
+        }
+
+        public void Dispose()
+        {
+            Close();
+        }
+
+        #region External Imports
+
+        //Open a single stream from a file
+        [DllImport("avifil32.dll")]
+        private static extern int AVIStreamOpenFromFile(
+                out IntPtr ppavi,
+                string szFile,
+                int fccType,
+                int lParam,
+                int mode,
+                int pclsidHandler);
+
+        //Release an open AVI stream
+        [DllImport("avifil32.dll")]
+        private static extern ulong AVIStreamRelease(IntPtr aviStream);
+
+        //Get a pointer to a GETFRAME object (returns 0 on error)
+        [DllImport("avifil32.dll")]
+        private static extern IntPtr AVIStreamGetFrameOpen(
+            IntPtr pAVIStream,
+            ref BITMAPINFOHEADER bih);
+
+        //Release the GETFRAME object
+        [DllImport("avifil32.dll")]
+        private static extern int AVIStreamGetFrameClose(IntPtr pGetFrameObj);
+
+        //Get a pointer to a packed DIB (returns 0 on error)
+        [DllImport("avifil32.dll")]
+        private static extern IntPtr AVIStreamGetFrame(
+            IntPtr pGetFrameObj,
+            int lPos);
+
+        //Read the format for a stream
+        [DllImport("avifil32.dll")]
+        private static extern int AVIStreamReadFormat(
+            IntPtr aviStream,
+            int lPos,
+            ref BITMAPINFOHEADER lpFormat,
+            ref int cbFormat);
+
+        //Get the length of a steam in samples
+        [DllImport("avifil32.dll")]
+        private static extern int AVIStreamLength(IntPtr pavi);
+
+        //Returns the starting sample number for the stream
+        [DllImport("avifil32.dll")]
+        private static extern int AVIStreamStart(IntPtr pavi);
+
+        #endregion
+
+    }
+}
