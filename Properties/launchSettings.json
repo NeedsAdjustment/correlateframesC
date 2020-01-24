@@ -1,7 +1,8 @@
 {
   "profiles": {
     "whiterabbitc": {
-      "commandName": "Project"
+      "commandName": "Project",
+      "commandLineArgs": "-f 10"
     }
   }
 }

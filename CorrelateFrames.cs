@@ -54,21 +54,15 @@ namespace whiterabbitc
                     "Frame separation")
                 {
                     Argument = new Argument<int>(defaultValue: () => 0)
-                },
-                new Option(
-                    new[] {"--title", "-title"},
-                    "Correlation title")
-                {
-                    Argument = new Argument<string>(defaultValue: () => "Correlation")
                 }
             };
 
-            rootCommand.Handler = CommandHandler.Create(new Action<DirectoryInfo, DirectoryInfo, int, int, int, int, int, string>(Excecute));
+            rootCommand.Handler = CommandHandler.Create(new Action<DirectoryInfo, DirectoryInfo, int, int, int, int, int>(Excecute));
 
             return rootCommand.InvokeAsync(args).Result;
         }
 
-        public static void Excecute(DirectoryInfo input, DirectoryInfo output, int frames, int mask, int maskx, int masky, int separation, string title)
+        public static void Excecute(DirectoryInfo input, DirectoryInfo output, int frames, int mask, int maskx, int masky, int separation)
         {
             FileInfo[] fileArray;
             int videoCount = 0, successCount = 0;
@@ -107,12 +101,13 @@ namespace whiterabbitc
                         using (AVIFrameReader aviRead = new AVIFrameReader(file.FullName))
                         {
                             if (maskx == 0) { maskx = mask; masky = mask; }
+                            int nFrames = aviRead.FrameCount < frames ? aviRead.FrameCount : frames;
 
                             Console.WriteLine("Reading " + Path.GetFileName(file.FullName) + "...");
 
                             //Load all frames from .avi into array
-                            byte[][] frameArray = new byte[aviRead.FrameCount][];
-                            for (int i = 0; i < aviRead.FrameCount; i++)
+                            byte[][] frameArray = new byte[nFrames][];
+                            for (int i = 0; i < nFrames; i++)
                             {
                                 frameArray[i] = aviRead.GetFrameData(i);
                             }
@@ -120,7 +115,7 @@ namespace whiterabbitc
                             Console.WriteLine("Processing...");
                             var correlationData = PlotCorrelation(maskx, masky, aviRead.FrameWidth, aviRead.FrameHeight, aviRead.FrameStride, frameArray, separation);
 
-                            int[] outputIndex = Enumerable.Range(1, aviRead.FrameCount).ToArray();
+                            int[] outputIndex = Enumerable.Range(1, nFrames).ToArray();
                             List<string> indexStr = outputIndex.Select(x => x.ToString()).ToList();
                             indexStr.Insert(0, "Frame");
 
@@ -141,7 +136,7 @@ namespace whiterabbitc
 
                             using (StreamWriter outputFile = fileOutput.CreateText())
                             {
-                                for (int x = 0; x < aviRead.FrameCount + 1; x++)
+                                for (int x = 0; x < nFrames + 1; x++)
                                 {
                                     string line = csvData[0][x] + "," + csvData[1][x] + "," + csvData[2][x];
                                     outputFile.WriteLine(line);
