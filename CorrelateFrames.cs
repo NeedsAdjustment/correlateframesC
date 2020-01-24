@@ -71,10 +71,10 @@ namespace whiterabbitc
         public static void Excecute(DirectoryInfo input, DirectoryInfo output, int frames, int mask, int maskx, int masky, int separation, string title)
         {
             FileInfo[] fileArray;
-            FileInfo inputFile = new FileInfo(input.FullName);
             int videoCount = 0, successCount = 0;
 
             if (input == null) input = new DirectoryInfo(Directory.GetCurrentDirectory());  //Use current directory if none specified
+            FileInfo inputFile = new FileInfo(input.FullName);
 
             if (input.Exists)
             {
