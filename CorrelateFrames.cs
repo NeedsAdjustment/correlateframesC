@@ -101,7 +101,7 @@ namespace whiterabbitc
                         using (AVIFrameReader aviRead = new AVIFrameReader(file.FullName))
                         {
                             if (maskx == 0) { maskx = mask; masky = mask; }
-                            int nFrames = aviRead.FrameCount < frames ? aviRead.FrameCount : frames;
+                            int nFrames = (aviRead.FrameCount < frames || frames < 1) ? aviRead.FrameCount : frames;
 
                             Console.WriteLine("Reading " + Path.GetFileName(file.FullName) + "...");
 
