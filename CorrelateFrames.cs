@@ -9,57 +9,65 @@ namespace whiterabbitc
 {
     class CorrelateFrames
     {
+        private const int framesDefault = 0, maskDefault = 3, maskXDefault = 0, maskYDefault = 3, sepDefault = 0;
+
         public static int Main(string[] args)
         {
-            var rootCommand = new RootCommand
+            if (args.Length != 1)
             {
-                new Option(
-                    new[] {"--input", "-i"},
-                    "Input file (.avi) or folder containing .avi files")
+                var rootCommand = new RootCommand
                 {
-                    Argument = new Argument<DirectoryInfo>(defaultValue: () => null)
-                },
-                new Option(
-                    new[] {"--output", "-o"},
-                    "Output folder to store results")
-                {
-                    Argument = new Argument<DirectoryInfo>(defaultValue: () => null)
-                },
-                new Option(
-                    new[] {"--frames", "-f"},
-                    "Frames to process")
-                {
-                    Argument = new Argument<int>(defaultValue: () => 0)
-                },
-                new Option(
-                    new[] {"--mask", "-m"},
-                    "Mask size")
-                {
-                    Argument = new Argument<int>(defaultValue: () => 3)
-                },
-                new Option(
-                    new[] {"--maskx", "-x"},
-                    "Mask X-dimension")
-                {
-                    Argument = new Argument<int>(defaultValue: () => 0)
-                },
-                new Option(
-                    new[] {"--masky", "-y"},
-                    "Mask Y-dimension")
-                {
-                    Argument = new Argument<int>(defaultValue: () => 3)
-                },
-                new Option(
-                    new[] {"--separation", "-s"},
-                    "Frame separation")
-                {
-                    Argument = new Argument<int>(defaultValue: () => 0)
-                }
-            };
+                    new Option(
+                        new[] {"--input", "-i"},
+                        "Input file (.avi) or folder containing .avi files")
+                    {
+                        Argument = new Argument<DirectoryInfo>(defaultValue: () => null)
+                    },
+                    new Option(
+                        new[] {"--output", "-o"},
+                        "Output folder to store results")
+                    {
+                        Argument = new Argument<DirectoryInfo>(defaultValue: () => null)
+                    },
+                    new Option(
+                        new[] {"--frames", "-f"},
+                        "Frames to process")
+                    {
+                        Argument = new Argument<int>(defaultValue: () => framesDefault)
+                    },
+                    new Option(
+                        new[] {"--mask", "-m"},
+                        "Mask size")
+                    {
+                        Argument = new Argument<int>(defaultValue: () => maskDefault)
+                    },
+                    new Option(
+                        new[] {"--maskx", "-x"},
+                        "Mask X-dimension")
+                    {
+                        Argument = new Argument<int>(defaultValue: () => maskXDefault)
+                    },
+                    new Option(
+                        new[] {"--masky", "-y"},
+                        "Mask Y-dimension")
+                    {
+                        Argument = new Argument<int>(defaultValue: () => maskYDefault)
+                    },
+                    new Option(
+                        new[] {"--separation", "-s"},
+                        "Frame separation")
+                    {
+                        Argument = new Argument<int>(defaultValue: () => sepDefault)
+                    }
+                };
 
-            rootCommand.Handler = CommandHandler.Create(new Action<DirectoryInfo, DirectoryInfo, int, int, int, int, int>(Excecute));
-
-            return rootCommand.InvokeAsync(args).Result;
+                rootCommand.Handler = CommandHandler.Create(new Action<DirectoryInfo, DirectoryInfo, int, int, int, int, int>(Excecute));
+                return rootCommand.InvokeAsync(args).Result;
+            } else
+            {
+                Excecute(new DirectoryInfo(args[0]), null, framesDefault, maskDefault, maskXDefault, maskYDefault, sepDefault);
+                return 0;
+            }
         }
 
         public static void Excecute(DirectoryInfo input, DirectoryInfo output, int frames, int mask, int maskx, int masky, int separation)
