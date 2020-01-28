@@ -123,9 +123,9 @@ namespace whiterabbitc
                             Console.WriteLine("Processing...");
                             var correlationData = PlotCorrelation(maskx, masky, aviRead.FrameWidth, aviRead.FrameHeight, aviRead.FrameStride, frameArray, separation);
 
-                            int[] outputIndex = Enumerable.Range(1, nFrames).ToArray();
-                            List<string> indexStr = outputIndex.Select(x => x.ToString()).ToList();
-                            indexStr.Insert(0, "Frame");
+                            string[] outputIndex = new string[nFrames + 1];
+                            outputIndex[0] = "Lag Time (s)";
+                            for (int i = 0; i < nFrames; i++) outputIndex[i + 1] = (i / aviRead.FrameRate).ToString();
 
                             List<string> correlationStr = correlationData.correlation.Select(x => x.ToString()).ToList();
                             correlationStr.Insert(0, "1");
@@ -135,7 +135,7 @@ namespace whiterabbitc
                             brightnessStr.Insert(0, "Brightness");
 
                             string[][] csvData = new string[3][];
-                            csvData[0] = indexStr.ToArray();
+                            csvData[0] = outputIndex;
                             csvData[1] = correlationStr.ToArray();
                             csvData[2] = brightnessStr.ToArray();
 

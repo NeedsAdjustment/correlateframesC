@@ -27,13 +27,41 @@ namespace whiterabbitc
             public int biClrImportant;
         }
 
+        //Structure containing information about a stream
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        public struct AVISTREAMINFO
+        {
+            public int fccType;
+            public int fccHandler;
+            public int dwFlags;
+            public int dwCaps;
+            public short wPriority;
+            public short wLanguage;
+            public int dwScale;
+            public int dwRate;
+            public int dwStart;
+            public int dwLength;
+            public int dwInitialFrames;
+            public int dwSuggestedBufferSize;
+            public int dwQuality;
+            public int dwSampleSize;
+            public uint rcFrameLeft;
+            public uint rcFrameTop;
+            public uint rcFrameRight;
+            public uint rcFrameBottom;
+            public int dwEditCount;
+            public int dwFormatChangeCount;
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 64)]
+            public ushort[] szName;
+        }
+
         private readonly IntPtr avi;
         private readonly IntPtr frameObj;
         private readonly int dataOffset;
-        private readonly int streamStart;
 
         private IntPtr frame;
         private BITMAPINFOHEADER bmInfo = new BITMAPINFOHEADER();
+        private AVISTREAMINFO stInfo = new AVISTREAMINFO();
         private bool streamClosed = false;
 
         /// <summary>
@@ -62,6 +90,11 @@ namespace whiterabbitc
         public int FrameSize { get; }
 
         /// <summary>
+        /// Returns the frame rate of the stream
+        /// </summary>
+        public double FrameRate { get; }
+
+        /// <summary>
         /// Opens a new .avi filestream for decoding based on the given path string.
         /// TODO: Extend colour format support; deal with inverted bitmaps
         /// </summary>
@@ -76,14 +109,16 @@ namespace whiterabbitc
                 throw new Exception("Unable to open file '" + path + "'. Error code: " + res.ToString());
             }
 
-            streamStart = AVIStreamStart(avi);
-            FrameCount = AVIStreamLength(avi) - streamStart - 1;
-            res = AVIStreamReadFormat(avi, 0, ref bmInfo, ref bmInfoSz);
+            if (AVIStreamInfo(avi, ref stInfo, Marshal.SizeOf(stInfo)) != 0)
+            {
+                throw new Exception("Unable to read .avi stream information");
+            }
 
             //Allow an error result here as only interested in the bitmap header and not subsequent not palette information
-            if (FrameCount < 0 || streamStart < 0 || (res != 0 && res != ERR_READ_ST_FMT_OVERFLOW))
+            res = AVIStreamReadFormat(avi, 0, ref bmInfo, ref bmInfoSz);
+            if (res != 0 && res != ERR_READ_ST_FMT_OVERFLOW)
             {
-                throw new Exception("Unable to read .avi format");
+                throw new Exception("Unable to read .avi stream format");
             }
 
             if (bmInfo.biBitCount != 8)
@@ -92,17 +127,18 @@ namespace whiterabbitc
             }
 
             frameObj = AVIStreamGetFrameOpen(avi, ref bmInfo);
-
             if (frameObj == null)
             {
                 throw new Exception("No suitible decompressors found for supplied .avi file");
             }
 
             //Load frame information
+            FrameCount = stInfo.dwLength - stInfo.dwStart - 1;
             FrameWidth = bmInfo.biWidth;
             FrameHeight = Math.Abs(bmInfo.biHeight);    //May be negative if bitmap inverted
             FrameStride = FrameWidth * bmInfo.biBitCount / 8;
             FrameSize = FrameStride * FrameHeight;
+            FrameRate = (double)stInfo.dwRate / stInfo.dwScale;
 
             //Offset is size of info header + colour palette (32 bpp)
             dataOffset = Marshal.SizeOf(bmInfo) + (bmInfo.biClrUsed * 4);
@@ -126,7 +162,7 @@ namespace whiterabbitc
                 throw new Exception("Supplied frame number is out of range");
             }
 
-            frame = AVIStreamGetFrame(frameObj, n + 1 + streamStart);
+            frame = AVIStreamGetFrame(frameObj, n + 1 + stInfo.dwStart);
 
             if (frame == null)
             {
@@ -216,13 +252,13 @@ namespace whiterabbitc
             ref BITMAPINFOHEADER lpFormat,
             ref int cbFormat);
 
-        //Get the length of a steam in samples
+        //Obtains stream header information
         [DllImport("avifil32.dll")]
-        private static extern int AVIStreamLength(IntPtr pavi);
-
-        //Returns the starting sample number for the stream
-        [DllImport("avifil32.dll")]
-        private static extern int AVIStreamStart(IntPtr pavi);
+        private static extern int AVIStreamInfo(
+            IntPtr pavi,
+            ref AVISTREAMINFO psi,
+            int lSize
+        );
 
         #endregion
 
