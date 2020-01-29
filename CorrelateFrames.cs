@@ -24,12 +24,6 @@ namespace whiterabbitc
                         Argument = new Argument<DirectoryInfo>(defaultValue: () => null)
                     },
                     new Option(
-                        new[] {"--output", "-o"},
-                        "Output folder to store results")
-                    {
-                        Argument = new Argument<DirectoryInfo>(defaultValue: () => null)
-                    },
-                    new Option(
                         new[] {"--frames", "-f"},
                         "Frames to process")
                     {
@@ -61,44 +55,47 @@ namespace whiterabbitc
                     }
                 };
 
-                rootCommand.Handler = CommandHandler.Create(new Action<DirectoryInfo, DirectoryInfo, int, int, int, int, int>(Excecute));
+                rootCommand.Handler = CommandHandler.Create(new Action<DirectoryInfo, int, int, int, int, int>(Excecute));
                 return rootCommand.InvokeAsync(args).Result;
             } else
             {
-                Excecute(new DirectoryInfo(args[0]), null, framesDefault, maskDefault, maskXDefault, maskYDefault, sepDefault);
+                Excecute(new DirectoryInfo(args[0]), framesDefault, maskDefault, maskXDefault, maskYDefault, sepDefault);
                 return 0;
             }
         }
 
-        public static void Excecute(DirectoryInfo input, DirectoryInfo output, int frames, int mask, int maskx, int masky, int separation)
+        public static void Excecute(DirectoryInfo input, int frames, int mask, int maskx, int masky, int separation)
         {
             FileInfo[] fileArray;
             int videoCount = 0, successCount = 0;
 
             if (input == null) input = new DirectoryInfo(Directory.GetCurrentDirectory());  //Use current directory if none specified
-            FileInfo inputFile = new FileInfo(input.FullName);
 
+            FileInfo inputFile = new FileInfo(input.FullName);
             if (input.Exists)
             {
-                fileArray = input.GetFiles();   //Input path is a directory; retrieve the list of files               
+                fileArray = input.GetFiles();   //Input path is a directory; retrieve the list of files
+                foreach (DirectoryInfo dir in input.GetDirectories())
+                {
+                    Excecute(dir, frames, mask, maskx, masky, separation);  //Recursively run on all sub-directories
+                }
             } else if(inputFile.Exists)
             {
-                fileArray = new FileInfo[] { new FileInfo(input.FullName) };    //Input path is a file; instantiate array with a single file
-                input = new DirectoryInfo(Path.GetDirectoryName(input.FullName));  //Use directory of file for output if not specified
+                fileArray = new FileInfo[] { inputFile };    //Input path is a file; instantiate array with a single file
+                input = new DirectoryInfo(Path.GetDirectoryName(input.FullName));  //Use directory of file as input directory
             }
-            else {
+            else 
+            {
                 Console.WriteLine(input + " does not exist.");
                 return;
             }
 
+            //Correct for omission of trailing '\' on directory path
+            string outDir = input.FullName.EndsWith('\\') ? input.FullName : input.FullName + '\\';
+
             foreach (FileInfo file in fileArray) if (file.Extension == ".avi") videoCount++;    //Count all the .avi files
             Console.WriteLine("Found " + videoCount + " video file(s) in " + input);
             if (videoCount == 0) return;
-
-            if (output == null) output = input; //Use input directory for output if not specified
-
-            //Correct for omission of trailing '\' on directory path
-            string outDir = output.FullName.EndsWith('\\') ? output.FullName : output.FullName + '\\';
 
             foreach (FileInfo file in fileArray)
             {

@@ -52,7 +52,7 @@ namespace whiterabbitc
             public int dwEditCount;
             public int dwFormatChangeCount;
             [MarshalAs(UnmanagedType.ByValArray, SizeConst = 64)]
-            public ushort[] szName;
+            public byte[] szName;
         }
 
         private readonly IntPtr avi;
